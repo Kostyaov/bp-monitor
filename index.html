@@ -1,0 +1,542 @@
+<!DOCTYPE html>
+<html lang="uk">
+
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Контроль тиску</title>
+  <!-- Google Fonts -->
+  <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;600;700&display=swap" rel="stylesheet">
+  <!-- Lucide icons -->
+  <script src="https://unpkg.com/lucide@latest"></script>
+  <!-- Tesseract.js -->
+  <script src="https://cdn.jsdelivr.net/npm/tesseract.js@5/dist/tesseract.min.js"></script>
+  <style>
+    :root {
+      --primary: #6366f1;
+      --primary-hover: #4f46e5;
+      --bg: #0f172a;
+      --card-bg: rgba(30, 41, 59, 0.7);
+      --glass-border: rgba(255, 255, 255, 0.1);
+      --text: #f8fafc;
+      --text-muted: #94a3b8;
+      --success: #10b981;
+      --error: #ef4444;
+    }
+
+    * {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+      -webkit-tap-highlight-color: transparent;
+    }
+
+    body {
+      font-family: 'Outfit', sans-serif;
+      background-color: var(--bg);
+      color: var(--text);
+      min-height: 100vh;
+      overflow-x: hidden;
+      background-image: radial-gradient(circle at 10% 20%, rgba(99, 102, 241, 0.15) 0%, transparent 40%),
+        radial-gradient(circle at 90% 80%, rgba(16, 185, 129, 0.1) 0%, transparent 40%);
+    }
+
+    .container {
+      max-width: 600px;
+      margin: 0 auto;
+      padding: 20px;
+      display: flex;
+      flex-direction: column;
+      gap: 20px;
+    }
+
+    header {
+      padding: 20px 0;
+      text-align: center;
+    }
+
+    h1 {
+      font-size: 1.8rem;
+      font-weight: 700;
+      letter-spacing: -0.02em;
+      margin-bottom: 4px;
+    }
+
+    .subtitle {
+      color: var(--text-muted);
+      font-size: 0.9rem;
+    }
+
+    /* Glass Card */
+    .card {
+      background: var(--card-bg);
+      backdrop-filter: blur(12px);
+      -webkit-backdrop-filter: blur(12px);
+      border: 1px solid var(--glass-border);
+      border-radius: 24px;
+      padding: 24px;
+      box-shadow: 0 10px 40px rgba(0, 0, 0, 0.3);
+      position: relative;
+      overflow: hidden;
+    }
+
+    /* Camera Section */
+    .video-container {
+      width: 100%;
+      aspect-ratio: 4 / 3;
+      background: #000;
+      border-radius: 16px;
+      position: relative;
+      overflow: hidden;
+      border: 1px solid var(--glass-border);
+    }
+
+    #video {
+      width: 100%;
+      height: 100%;
+      object-fit: cover;
+    }
+
+    .camera-overlay {
+      position: absolute;
+      top: 50%;
+      left: 50%;
+      transform: translate(-50%, -50%);
+      width: 80%;
+      height: 60%;
+      border: 2px dashed rgba(255, 255, 255, 0.4);
+      border-radius: 12px;
+      pointer-events: none;
+    }
+
+    .btn {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 10px;
+      padding: 14px 24px;
+      border-radius: 16px;
+      border: none;
+      font-family: inherit;
+      font-size: 1rem;
+      font-weight: 600;
+      cursor: pointer;
+      transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+    }
+
+    .btn-primary {
+      background: var(--primary);
+      color: white;
+      width: 100%;
+      margin-top: 15px;
+    }
+
+    .btn-primary:active {
+      transform: scale(0.98);
+      background: var(--primary-hover);
+    }
+
+    .btn-secondary {
+      background: rgba(255, 255, 255, 0.1);
+      color: white;
+      border: 1px solid var(--glass-border);
+    }
+
+    /* Results */
+    .results-grid {
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      gap: 15px;
+      margin-top: 20px;
+    }
+
+    .input-group {
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+    }
+
+    .input-group label {
+      font-size: 0.75rem;
+      color: var(--text-muted);
+      text-transform: uppercase;
+      letter-spacing: 0.05em;
+    }
+
+    .input-field {
+      background: rgba(15, 23, 42, 0.5);
+      border: 1px solid var(--glass-border);
+      color: white;
+      padding: 12px;
+      border-radius: 12px;
+      font-size: 1.2rem;
+      font-weight: 700;
+      text-align: center;
+      width: 100%;
+    }
+
+    /* History Table */
+    .history-card {
+      margin-top: 10px;
+    }
+
+    .history-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-bottom: 16px;
+    }
+
+    .history-table {
+      width: 100%;
+      border-collapse: collapse;
+      font-size: 0.85rem;
+    }
+
+    .history-table th {
+      text-align: left;
+      padding: 12px 8px;
+      color: var(--text-muted);
+      border-bottom: 1px solid var(--glass-border);
+    }
+
+    .history-table td {
+      padding: 12px 8px;
+      border-bottom: 1px solid rgba(255, 255, 255, 0.05);
+    }
+
+    .val-cell {
+      font-weight: 600;
+      color: var(--text);
+    }
+
+    .date-cell {
+      font-size: 0.75rem;
+      color: var(--text-muted);
+    }
+
+    /* Status & Loading */
+    #status {
+      position: absolute;
+      top: 10px;
+      right: 10px;
+      padding: 4px 10px;
+      border-radius: 8px;
+      font-size: 0.7rem;
+      font-weight: 600;
+    }
+
+    .loading-overlay {
+      position: absolute;
+      inset: 0;
+      background: rgba(15, 23, 42, 0.8);
+      display: none;
+      align-items: center;
+      justify-content: center;
+      flex-direction: column;
+      gap: 15px;
+      z-index: 10;
+      border-radius: 24px;
+    }
+
+    .spinner {
+      width: 40px;
+      height: 40px;
+      border: 3px solid rgba(255, 255, 255, 0.1);
+      border-top-color: var(--primary);
+      border-radius: 50%;
+      animation: spin 1s linear infinite;
+    }
+
+    @keyframes spin {
+      to {
+        transform: rotate(360deg);
+      }
+    }
+
+    .badge {
+      padding: 2px 6px;
+      border-radius: 4px;
+      font-size: 0.6rem;
+      background: var(--primary);
+      color: white;
+    }
+
+    /* Animation */
+    .fade-in {
+      animation: fadeIn 0.4s ease-out;
+    }
+
+    @keyframes fadeIn {
+      from {
+        opacity: 0;
+        transform: translateY(10px);
+      }
+
+      to {
+        opacity: 1;
+        transform: translateY(0);
+      }
+    }
+
+    /* Floating Image Preview */
+    #capturedImagePreview {
+      display: none;
+      width: 60px;
+      height: 60px;
+      object-fit: cover;
+      border-radius: 12px;
+      border: 2px solid var(--primary);
+    }
+  </style>
+</head>
+
+<body>
+
+  <div class="container fade-in">
+    <header>
+      <h1>Контроль Тиску</h1>
+      <p class="subtitle">Фото-фіксація та автоматичний облік</p>
+    </header>
+
+    <div class="card" id="mainCard">
+      <div id="status"></div>
+
+      <div class="loading-overlay" id="loading">
+        <div class="spinner"></div>
+        <p id="loadingText">Обробка фото...</p>
+      </div>
+
+      <div class="video-container">
+        <video id="video" autoplay playsinline muted></video>
+        <div class="camera-overlay"></div>
+      </div>
+
+      <div style="display: flex; gap: 10px; margin-top: 15px;">
+        <button class="btn btn-primary" id="captureBtn">
+          <i data-lucide="camera"></i> Зняти Показники
+        </button>
+        <button class="btn btn-secondary" onclick="exportData()">
+          <i data-lucide="download"></i> Excel
+        </button>
+      </div>
+
+      <div class="results-grid" id="results">
+        <div class="input-group">
+          <label>SYS (Верхній)</label>
+          <input type="number" id="sys" class="input-field" placeholder="0">
+        </div>
+        <div class="input-group">
+          <label>DIA (Нижній)</label>
+          <input type="number" id="dia" class="input-field" placeholder="0">
+        </div>
+        <div class="input-group">
+          <label>Pulse (Пульс)</label>
+          <input type="number" id="pul" class="input-field" placeholder="0">
+        </div>
+      </div>
+
+      <div id="saveContainer" style="display: none;">
+        <img id="capturedImagePreview">
+        <button class="btn btn-primary" id="saveBtn" style="background: var(--success);">
+          <i data-lucide="check-circle-2"></i> Підтвердити та Зберегти
+        </button>
+      </div>
+    </div>
+
+    <div class="card history-card">
+      <div class="history-header">
+        <h2 style="font-size: 1.1rem;">Останні заміри</h2>
+        <span class="badge" id="recordCount">0</span>
+      </div>
+      <div style="overflow-x: auto;">
+        <table class="history-table">
+          <thead>
+            <tr>
+              <th>Дата</th>
+              <th>SYS/DIA</th>
+              <th>PUL</th>
+              <th></th>
+            </tr>
+          </thead>
+          <tbody id="historyBody">
+            <!-- Rows will be injected here -->
+          </tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+
+  <canvas id="canvas" style="display: none;"></canvas>
+
+  <script>
+    lucide.createIcons();
+
+    // --- CONFIGURATION ---
+    // Вставте сюди ваш Web App URL після деплою в Google Apps Script
+    const GAS_URL = "https://script.google.com/macros/s/AKfycbwhOATp5BeuxsEzIen6JTqUaRUpC0M9G1ihDxb8A9Hw0UTRjpxVGNA5SURk99o3hRce/exec";
+    // --- END CONFIGURATION ---
+
+    let stream;
+    const video = document.getElementById('video');
+    const canvas = document.getElementById('canvas');
+    const loading = document.getElementById('loading');
+    const loadingText = document.getElementById('loadingText');
+    const historyBody = document.getElementById('historyBody');
+    let capturedImageData = null;
+
+    // Start Camera - Maximum compatibility version
+    async function startCamera() {
+      const statusEl = document.getElementById('status');
+      try {
+        if (stream) stream.getTracks().forEach(track => track.stop());
+
+        // Attempt 1: Back camera with ideal settings
+        try {
+          stream = await navigator.mediaDevices.getUserMedia({
+            video: {
+              facingMode: { ideal: 'environment' },
+              width: { ideal: 1280 },
+              height: { ideal: 720 }
+            }
+          });
+        } catch (e) {
+          console.warn("Attempt 1 failed, trying simplified constraints...");
+          // Attempt 2: Minimal constraints
+          stream = await navigator.mediaDevices.getUserMedia({ video: true });
+        }
+
+        video.srcObject = stream;
+        statusEl.innerText = 'Камера OK';
+        statusEl.style.color = 'var(--success)';
+        
+        // Remove retry button if it exists
+        const oldRetry = document.getElementById('retryBtn');
+        if (oldRetry) oldRetry.remove();
+        
+      } catch (err) {
+        console.error("Camera Error:", err);
+        let errorMsg = "Доступ до камери заблоковано.";
+        
+        if (err.name === 'NotAllowedError' || err.name === 'PermissionDeniedError') {
+          errorMsg = "Доступ відхилено браузером.";
+        }
+
+        alert(`${errorMsg}\n\n1. Переконайтеся, що ви відкрили посилання в CHROME.\n2. Натисніть на значок 🔒 біля адреси сайту та дозвольте камеру.\n\nПомилка: ${err.message}`);
+        
+        statusEl.innerText = 'Помилка доступу';
+        statusEl.style.color = 'var(--error)';
+
+        if (!document.getElementById('retryBtn')) {
+          const retryBtn = document.createElement('button');
+          retryBtn.id = 'retryBtn';
+          retryBtn.className = 'btn btn-secondary';
+          retryBtn.innerText = 'Натисніть сюди, щоб дозволити камеру';
+          retryBtn.style.marginTop = '10px';
+          retryBtn.onclick = startCamera;
+          video.parentElement.appendChild(retryBtn);
+        }
+      }
+    }
+
+    // Capture & OCR
+    document.getElementById('captureBtn').onclick = async () => {
+      const context = canvas.getContext('2d');
+      canvas.width = video.videoWidth;
+      canvas.height = video.videoHeight;
+      context.drawImage(video, 0, 0, canvas.width, canvas.height);
+
+      const imageData = canvas.toDataURL('image/jpeg', 0.8);
+      capturedImageData = imageData;
+
+      document.getElementById('capturedImagePreview').src = imageData;
+      document.getElementById('capturedImagePreview').style.display = 'block';
+      document.getElementById('saveContainer').style.display = 'block';
+
+      loading.style.display = 'flex';
+      loadingText.innerText = "Розпізнавання тексту...";
+
+      try {
+        const result = await Tesseract.recognize(imageData, 'eng');
+        parseOCRResult(result.data.text);
+      } catch (err) {
+        console.error("OCR Error:", err);
+      } finally {
+        loading.style.display = 'none';
+      }
+    };
+
+    function parseOCRResult(text) {
+      const numbers = text.match(/\b\d{2,3}\b/g) || [];
+      if (numbers.length >= 2) {
+        document.getElementById('sys').value = numbers[0] || '';
+        document.getElementById('dia').value = numbers[1] || '';
+        document.getElementById('pul').value = numbers[2] || '';
+      }
+    }
+
+    // Save Data via fetch (CORS)
+    document.getElementById('saveBtn').onclick = async () => {
+      if (GAS_URL === "ВАШ_НОВИЙ_WEB_APP_URL") {
+        alert("Будь ласка, вставте ваш GAS URL у код файлу Index.html");
+        return;
+      }
+
+      const data = {
+        sys: document.getElementById('sys').value,
+        dia: document.getElementById('dia').value,
+        pul: document.getElementById('pul').value,
+        image: capturedImageData,
+        ocrMethod: 'Tesseract.js'
+      };
+
+      if (!data.sys || !data.dia) {
+        alert("Заповніть показники тиску");
+        return;
+      }
+
+      loading.style.display = 'flex';
+      loadingText.innerText = "Відправка даних у Google...";
+
+      try {
+        const response = await fetch(GAS_URL, {
+          method: 'POST',
+          mode: 'no-cors', // Critical for GAS to avoid preflight issues
+          body: JSON.stringify(data),
+          headers: {
+            'Content-Type': 'text/plain;charset=utf-8' // Use text/plain to bypass CORS preflight
+          }
+        });
+
+        // Since we use 'no-cors', we won't get the body, but it sends successfully
+        alert("Дані надіслано! Перевірте Google Таблицю.");
+
+        loading.style.display = 'none';
+        document.getElementById('saveContainer').style.display = 'none';
+        document.getElementById('sys').value = '';
+        document.getElementById('dia').value = '';
+        document.getElementById('pul').value = '';
+        // Note: loadHistory won't work easily with no-cors, but the data is saved.
+      } catch (err) {
+        loading.style.display = 'none';
+        alert("Помилка відправки: " + err.message);
+      }
+    };
+
+    function formatDate(dateStr) {
+      const d = new Date(dateStr);
+      return d.toLocaleDateString('uk-UA', { day: '2-digit', month: '2-digit' }) + ' ' +
+        d.toLocaleTimeString('uk-UA', { hour: '2-digit', minute: '2-digit' });
+    }
+
+    // Initial Load
+    startCamera();
+
+    // Export Logic (direct link to the Sheet)
+    function exportData() {
+      alert("Синхронізація з Таблицею Google автоматична. Ви можете завантажити Excel безпосередньо з вашої Google Таблиці.");
+    }
+  </script>
+</body>
+
+</html>
