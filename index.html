@@ -372,7 +372,7 @@
     lucide.createIcons();
 
     // --- CONFIGURATION ---
-    const GAS_URL = "https://script.google.com/macros/s/AKfycbwhOATp5BeuxsEzIen6JTqUaRUpC0M9G1ihDxb8A9Hw0UTRjpxVGNA5SURk99o3hRce/exec"; 
+    const GAS_URL = "https://script.google.com/macros/s/AKfycbyZ6UDJIOFBAcOJOguMyTneBg88PJrnmb0Ely2yJJPKG_eQCoNqQzX4Ir8ILz6Wc-NU/exec";
     // --- END CONFIGURATION ---
 
     let stream;
@@ -406,10 +406,10 @@
         video.srcObject = stream;
         statusEl.innerText = 'Камера OK';
         statusEl.style.color = 'var(--success)';
-        
+
         const oldRetry = document.getElementById('retryBtn');
         if (oldRetry) oldRetry.remove();
-        
+
       } catch (err) {
         console.error("Camera Error:", err);
         statusEl.innerText = 'Помилка доступу';
@@ -433,29 +433,29 @@
       canvas.width = video.videoWidth;
       canvas.height = video.videoHeight;
       context.drawImage(video, 0, 0, canvas.width, canvas.height);
-      
+
       capturedImageData = canvas.toDataURL('image/jpeg', 0.8);
-      
+
       document.getElementById('capturedImagePreview').src = capturedImageData;
       document.getElementById('capturedImagePreview').style.display = 'block';
       document.getElementById('saveContainer').style.display = 'block';
 
       loading.style.display = 'flex';
       loadingText.innerText = "Gemini AI аналізує та зберігає фото...";
-      
+
       try {
         // We send directly to AI for recognition and saving in one go
         await fetch(GAS_URL, {
           method: 'POST',
           mode: 'no-cors',
-          body: JSON.stringify({ 
-            action: 'ocr_and_save', 
-            image: capturedImageData 
+          body: JSON.stringify({
+            action: 'ocr_and_save',
+            image: capturedImageData
           })
         });
-        
+
         alert("Запит AI надіслано! Дані будуть записані в таблицю протягом 2-3 секунд. Перевірте Google Таблицю.");
-        
+
         // Clear fields for next entry
         document.getElementById('sys').value = '';
         document.getElementById('dia').value = '';
