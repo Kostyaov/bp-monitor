@@ -1,128 +1,199 @@
 /**
- * Google Apps Script API for Blood Pressure Monitor (AI Version)
+ * Blood Pressure Monitor — Google Apps Script API
+ * Gemini 1.5 Flash OCR + Google Sheets storage
  */
 
-const GEMINI_API_KEY = "AIzaSyAvg-rdWXGMihQtPDye6TdRtsEMRWizPKI"; // Отримайте безкоштовно на https://aistudio.google.com/app/apikey
+const GEMINI_API_KEY = "AIzaSyAvg-rdWXGMihQtPDye6TdRtsEMRWizPKI";
+const HISTORY_LIMIT  = 100; // Max records to return
 
+// ---------------------------------------------------------------------------
+// doGet — simple health-check (browser can open the URL to verify)
+// ---------------------------------------------------------------------------
 function doGet() {
-  return HtmlService.createHtmlOutput('AI API is running. Use POST for OCR and Storage.')
-    .setTitle('BP AI API');
+  return HtmlService
+    .createHtmlOutput('<h2>✅ BP Monitor API is running</h2>')
+    .setTitle('BP API');
 }
 
-/**
- * Handles incoming POST requests (API calls).
- */
+// ---------------------------------------------------------------------------
+// doPost — main API router
+// ---------------------------------------------------------------------------
 function doPost(e) {
   try {
     const data = JSON.parse(e.postData.contents);
-    
-    // ACTION: OCR & SAVE (Combined for mobile efficiency)
-    if (data.action === 'ocr' || data.action === 'ocr_and_save') {
-      const ocrResult = callGeminiOCR(data.image);
-      const storageResult = processEntry({
-        ...data,
-        sys: ocrResult.sys,
-        dia: ocrResult.dia,
-        pul: ocrResult.pul
-      });
-      return createJsonResponse({ 
-        status: 'success', 
-        result: ocrResult,
-        storage: storageResult 
-      });
+
+    switch (data.action) {
+
+      // ── 1. OCR only (no save) ──────────────────────────────────────────
+      case 'ocr': {
+        const result = callGeminiOCR(data.image);
+        return json({ status: 'success', sys: result.sys, dia: result.dia, pul: result.pul });
+      }
+
+      // ── 2. Save only (values provided by frontend after user review) ───
+      case 'save': {
+        const entry = saveEntry(data);
+        return json({ status: 'success', entry });
+      }
+
+      // ── 3. Get history records ─────────────────────────────────────────
+      case 'getHistory': {
+        const records = readHistory(data.limit || HISTORY_LIMIT);
+        return json({ status: 'success', records });
+      }
+
+      default:
+        return json({ status: 'error', message: 'Unknown action: ' + data.action });
     }
-    
-    // ACTION: SAVE
-    const result = processEntry(data);
-    return createJsonResponse({ status: 'success', data: result });
-    
+
   } catch (err) {
-    return createJsonResponse({ status: 'error', message: err.toString() });
+    Logger.log('doPost error: ' + err.toString());
+    return json({ status: 'error', message: err.toString() });
   }
 }
 
-function createJsonResponse(obj) {
-  return ContentService.createTextOutput(JSON.stringify(obj))
-    .setMimeType(ContentService.MimeType.JSON);
-}
-
-/**
- * Calls Gemini 1.5 Flash to extract BP values from picture.
- */
+// ---------------------------------------------------------------------------
+// Gemini 1.5 Flash — OCR
+// ---------------------------------------------------------------------------
 function callGeminiOCR(base64Image) {
-  if (GEMINI_API_KEY === "ВАШ_КЛЮЧ_ТУТ") {
-    throw new Error("Будь ласка, вставте Gemini API Key у Code.gs");
+  if (!GEMINI_API_KEY || GEMINI_API_KEY === 'ВАШ_КЛЮЧ_ТУТ') {
+    throw new Error('Будь ласка, вставте Gemini API Key у Code.gs (рядок 7)');
   }
 
   const url = `https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${GEMINI_API_KEY}`;
-  
+
   const payload = {
-    "contents": [{
-      "parts": [
-        {"text": "Analyze this blood pressure monitor screen. Extract: 1. Systolic (SYS), 2. Diastolic (DIA), 3. Pulse (PUL). Return ONLY a JSON object like this: {\"sys\": number, \"dia\": number, \"pul\": number}. If not found, return 0 for that value."},
-        {"inlineData": {
-          "mimeType": "image/jpeg",
-          "data": base64Image.split(',')[1]
-        }}
+    contents: [{
+      parts: [
+        {
+          text: 'This is a photo of a blood pressure monitor (tonometer) screen. ' +
+                'Extract exactly three numbers: ' +
+                '1. Systolic pressure (SYS / upper / larger number), ' +
+                '2. Diastolic pressure (DIA / lower / smaller number), ' +
+                '3. Pulse (heart rate). ' +
+                'Return ONLY valid JSON like: {"sys":120,"dia":80,"pul":72}. ' +
+                'Use 0 for any value you cannot clearly read. No extra text.'
+        },
+        {
+          inlineData: {
+            mimeType: 'image/jpeg',
+            data: base64Image.replace(/^data:image\/\w+;base64,/, '')
+          }
+        }
       ]
     }]
   };
 
-  const options = {
-    "method": "post",
-    "contentType": "application/json",
-    "payload": JSON.stringify(payload)
-  };
+  const response = UrlFetchApp.fetch(url, {
+    method: 'post',
+    contentType: 'application/json',
+    payload: JSON.stringify(payload),
+    muteHttpExceptions: true
+  });
 
-  const response = UrlFetchApp.fetch(url, options);
-  const result = JSON.parse(response.getContentText());
-  
+  const raw = JSON.parse(response.getContentText());
+
+  if (raw.error) {
+    throw new Error('Gemini API error: ' + raw.error.message);
+  }
+
   try {
-    const aiText = result.candidates[0].content.parts[0].text;
-    const cleanJson = aiText.replace(/```json|```/g, "").trim();
-    return JSON.parse(cleanJson);
-  } catch (e) {
-    Logger.log("AI Response Error: " + e.toString());
+    const aiText = raw.candidates[0].content.parts[0].text;
+    const cleaned = aiText.replace(/```json|```/g, '').trim();
+    const parsed  = JSON.parse(cleaned);
+    return {
+      sys: Number(parsed.sys) || 0,
+      dia: Number(parsed.dia) || 0,
+      pul: Number(parsed.pul) || 0
+    };
+  } catch (parseErr) {
+    Logger.log('AI parse error: ' + parseErr + ' | Raw: ' + JSON.stringify(raw));
     return { sys: 0, dia: 0, pul: 0 };
   }
 }
 
-/**
- * Saves recognized data and photo.
- */
-function processEntry(data) {
-  const ss = SpreadsheetApp.getActiveSpreadsheet();
-  let sheet = ss.getSheetByName('History');
-  
+// ---------------------------------------------------------------------------
+// Save entry to Google Sheets
+// ---------------------------------------------------------------------------
+function saveEntry(data) {
+  const ss    = SpreadsheetApp.getActiveSpreadsheet();
+  let sheet   = ss.getSheetByName('History');
+
+  // Create sheet with headers if it doesn't exist
   if (!sheet) {
     sheet = ss.insertSheet('History');
-    sheet.appendRow(['Дата і час', 'SYS', 'DIA', 'PUL', 'Фото', 'Метод']);
-    sheet.getRange(1, 1, 1, 6).setFontWeight('bold').setBackground('#f3f3f3');
+    const headers = ['Дата і час', 'SYS', 'DIA', 'PUL', 'Фото', 'Метод'];
+    sheet.appendRow(headers);
+    sheet.getRange(1, 1, 1, headers.length)
+         .setFontWeight('bold')
+         .setBackground('#f3f3f3');
   }
 
-  let photoUrl = 'No photo';
-  if (data.image) photoUrl = savePhoto(data.image);
+  // Save photo to Drive (optional — skip if no image)
+  let photoUrl = '';
+  if (data.image) {
+    try { photoUrl = savePhotoToDrive(data.image); } catch(e) { photoUrl = ''; }
+  }
 
   const timestamp = new Date();
-  sheet.appendRow([
-    timestamp, data.sys, data.dia, data.pul, photoUrl, 'Gemini AI'
-  ]);
+  sheet.appendRow([timestamp, Number(data.sys), Number(data.dia), Number(data.pul), photoUrl, 'Gemini AI']);
 
-  return { timestamp: timestamp, photoUrl: photoUrl };
+  return {
+    date: timestamp.toISOString(),
+    sys:  Number(data.sys),
+    dia:  Number(data.dia),
+    pul:  Number(data.pul)
+  };
 }
 
-function savePhoto(base64Image) {
-  try {
-    const folderName = 'BP_Photos';
-    let folders = DriveApp.getFoldersByName(folderName);
-    let folder = folders.hasNext() ? folders.next() : DriveApp.createFolder(folderName);
+// ---------------------------------------------------------------------------
+// Read history from Google Sheets (returns newest first)
+// ---------------------------------------------------------------------------
+function readHistory(limit) {
+  const ss    = SpreadsheetApp.getActiveSpreadsheet();
+  const sheet = ss.getSheetByName('History');
+  if (!sheet) return [];
 
-    const bytes = Utilities.base64Decode(base64Image.split(',')[1]);
-    const blob = Utilities.newBlob(bytes, "image/jpeg", `BP_${new Date().getTime()}.jpg`);
-    const file = folder.createFile(blob);
-    file.setSharing(DriveApp.Access.ANYONE_WITH_LINK, DriveApp.Permission.VIEW);
-    return file.getUrl();
-  } catch (e) {
-    return 'Error: ' + e.toString();
-  }
+  const lastRow = sheet.getLastRow();
+  if (lastRow <= 1) return []; // Only header row
+
+  const startRow = Math.max(2, lastRow - limit + 1);
+  const numRows  = lastRow - startRow + 1;
+  const values   = sheet.getRange(startRow, 1, numRows, 4).getValues();
+
+  // Reverse so newest is first
+  return values.reverse().map(function(row) {
+    return {
+      date: row[0] ? new Date(row[0]).toISOString() : '',
+      sys:  Number(row[1]) || 0,
+      dia:  Number(row[2]) || 0,
+      pul:  Number(row[3]) || 0
+    };
+  });
+}
+
+// ---------------------------------------------------------------------------
+// Save photo to Google Drive folder
+// ---------------------------------------------------------------------------
+function savePhotoToDrive(base64Image) {
+  const folderName = 'BP_Photos';
+  let folders = DriveApp.getFoldersByName(folderName);
+  let folder  = folders.hasNext() ? folders.next() : DriveApp.createFolder(folderName);
+
+  const rawBase64 = base64Image.replace(/^data:image\/\w+;base64,/, '');
+  const bytes      = Utilities.base64Decode(rawBase64);
+  const blob       = Utilities.newBlob(bytes, 'image/jpeg', 'BP_' + Date.now() + '.jpg');
+  const file       = folder.createFile(blob);
+
+  file.setSharing(DriveApp.Access.ANYONE_WITH_LINK, DriveApp.Permission.VIEW);
+  return file.getUrl();
+}
+
+// ---------------------------------------------------------------------------
+// Helper: create JSON response
+// ---------------------------------------------------------------------------
+function json(obj) {
+  return ContentService
+    .createTextOutput(JSON.stringify(obj))
+    .setMimeType(ContentService.MimeType.JSON);
 }
