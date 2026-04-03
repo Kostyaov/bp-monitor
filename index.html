@@ -1091,7 +1091,12 @@
               }
             ]
           }],
-          generationConfig: { temperature: 0, maxOutputTokens: 64 }
+          generationConfig: {
+            temperature: 0,
+            maxOutputTokens: 512  // 64 was too low; thinking mode was consuming all tokens
+          },
+          // Disable thinking for gemini-2.5-flash (simple task, no reasoning needed)
+          thinkingConfig: { thinkingBudget: 0 }
         })
       });
 
@@ -1101,7 +1106,16 @@
       }
 
       const data = await res.json();
-      const text = (data.candidates?.[0]?.content?.parts?.[0]?.text || '').trim();
+
+      // Check for safety/other blocks
+      const finishReason = data.candidates?.[0]?.finishReason;
+      if (finishReason && finishReason !== 'STOP' && finishReason !== 'MAX_TOKENS') {
+        throw new Error(`Gemini заблокував відповідь (${finishReason}). Спробуйте інший знімок.`);
+      }
+
+      // Join all parts (thinking model may split text across multiple parts)
+      const parts = data.candidates?.[0]?.content?.parts || [];
+      const text = parts.map(p => p.text || '').join('').trim();
 
       // 1) Try strict JSON parse (strip markdown fences if present)
       const clean = text
@@ -1127,7 +1141,7 @@
             pul: +( nums[2] || 0)
           };
         }
-        throw new Error('AI не зміг парсити відповідь: ' + text.slice(0, 80));
+        throw new Error('Порожня відповідь від AI.\nRaw: ' + JSON.stringify(data?.candidates?.[0]).slice(0, 300));
       }
     }
 
