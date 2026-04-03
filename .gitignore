@@ -1,0 +1,7 @@
+# Ignore the Apps Script backend file — contains API key
+# Copy this file manually into Google Apps Script editor
+Code.gs
+
+# Editor/OS files
+.DS_Store
+*.swp
