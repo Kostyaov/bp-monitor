@@ -998,6 +998,23 @@
     </div>
   </div>
 
+  <!-- ── Error Detail Modal ─────────────────────────────────────────────── -->
+  <div class="modal-overlay" id="errorModal">
+    <div class="modal-card">
+      <h3 style="color:#ef4444">&#x26A0;&#xFE0F; Помилка API</h3>
+      <p style="margin-bottom:10px">Повний текст помилки (можна скопіювати):</p>
+      <textarea id="errorText" readonly
+        style="width:100%;min-height:120px;background:rgba(239,68,68,.07);border:1px solid rgba(239,68,68,.3);
+               border-radius:10px;color:#fca5a5;font-family:monospace;font-size:0.78rem;
+               padding:12px;resize:vertical;box-sizing:border-box;line-height:1.5"
+      ></textarea>
+      <div class="modal-row" style="margin-top:14px">
+        <button class="btn btn-ghost" id="closeErrorBtn">Закрити</button>
+        <button class="btn btn-primary" id="copyErrorBtn">📋 Скопіювати</button>
+      </div>
+    </div>
+  </div>
+
   <!-- Hidden canvas for frame capture -->
   <canvas id="canvas" style="display:none;"></canvas>
   <!-- Toast -->
@@ -1216,7 +1233,7 @@
           openSettings();
         } else {
           ocrWarning.classList.add('show');
-          showToast('Помилка AI: ' + err.message.slice(0, 60), 'error');
+          showError(err.message);
         }
       } finally {
         hideOverlay();
@@ -1384,6 +1401,41 @@
       clearTimeout(toastTimer);
       toastTimer = setTimeout(() => { toast.className = type; }, 3500);
     }
+
+    // ────────────────────────────────────────────────────────────────────────
+    // Error modal
+    // ────────────────────────────────────────────────────────────────────────
+    function showError(msg) {
+      const modal = document.getElementById('errorModal');
+      const ta    = document.getElementById('errorText');
+      // Full context to help debug
+      ta.value = [
+        'Модель: gemini-2.5-flash',
+        'Час: ' + new Date().toLocaleString('uk-UA'),
+        'Помилка: ' + msg
+      ].join('\n');
+      modal.classList.add('open');
+    }
+
+    document.getElementById('closeErrorBtn').onclick = () =>
+      document.getElementById('errorModal').classList.remove('open');
+
+    document.getElementById('errorModal').addEventListener('click', e => {
+      if (e.target === e.currentTarget)
+        document.getElementById('errorModal').classList.remove('open');
+    });
+
+    document.getElementById('copyErrorBtn').onclick = async () => {
+      const text = document.getElementById('errorText').value;
+      try {
+        await navigator.clipboard.writeText(text);
+        showToast('Скопійовано!', 'success');
+      } catch {
+        document.getElementById('errorText').select();
+        document.execCommand('copy');
+        showToast('Скопійовано!', 'success');
+      }
+    };
 
     // ────────────────────────────────────────────────────────────────────────
     // Settings modal
