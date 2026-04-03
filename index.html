@@ -1012,7 +1012,7 @@
     // GAS is used only as a fire-and-forget backup to Google Sheets.
     // OCR runs directly in the browser via Gemini API (no CORS issues).
     const GAS_URL = 'https://script.google.com/macros/s/AKfycbwy8OLYKBmPVXUmymeJqVQIlANvAJS042H7G3HcsOv93jdVTyzdYbMU_KoKI4IPJ3E/exec';
-    const GEMINI_ENDPOINT = 'https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent';
+    const GEMINI_ENDPOINT = 'https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent';
     const LS_HISTORY = 'bp_history';   // localStorage key
     const LS_API_KEY = 'bp_gemini_key'; // localStorage key
 
@@ -1084,10 +1084,34 @@
       }
 
       const data = await res.json();
-      const text = data.candidates?.[0]?.content?.parts?.[0]?.text || '{}';
-      // Strip possible markdown fences
-      const clean = text.replace(/```[a-z]*/gi, '').replace(/```/g, '').trim();
-      return JSON.parse(clean);
+      const text = (data.candidates?.[0]?.content?.parts?.[0]?.text || '').trim();
+
+      // 1) Try strict JSON parse (strip markdown fences if present)
+      const clean = text
+        .replace(/^```[a-z]*\n?/i, '')
+        .replace(/```$/,            '')
+        .trim();
+
+      try {
+        const parsed = JSON.parse(clean);
+        return {
+          sys: parseInt(parsed.sys) || 0,
+          dia: parseInt(parsed.dia) || 0,
+          pul: parseInt(parsed.pul  ?? parsed.pulse ?? parsed.hr) || 0
+        };
+      } catch (_) {
+        // 2) Regex fallback: grab all 2-3 digit numbers from the response
+        const nums = (clean || text).match(/\b(\d{2,3})\b/g);
+        if (nums && nums.length >= 2) {
+          console.warn('JSON parse failed, using regex fallback:', text);
+          return {
+            sys: +nums[0] || 0,
+            dia: +nums[1] || 0,
+            pul: +( nums[2] || 0)
+          };
+        }
+        throw new Error('AI не зміг парсити відповідь: ' + text.slice(0, 80));
+      }
     }
 
     // ────────────────────────────────────────────────────────────────────────
@@ -1152,11 +1176,14 @@
     document.getElementById('captureBtn').onclick = async () => {
       if (!cameraStream) { await startCamera(); return; }
 
-      // Grab frame from video
-      canvas.width = video.videoWidth || 1280;
-      canvas.height = video.videoHeight || 720;
-      canvas.getContext('2d').drawImage(video, 0, 0);
-      capturedImage = canvas.toDataURL('image/jpeg', 0.85);
+      // Grab frame from video — limit to 800px to avoid phone slowdown
+      const vw = video.videoWidth  || 1280;
+      const vh = video.videoHeight || 720;
+      const scale = Math.min(1, 800 / vw);       // never upscale
+      canvas.width  = Math.round(vw * scale);
+      canvas.height = Math.round(vh * scale);
+      canvas.getContext('2d').drawImage(video, 0, 0, canvas.width, canvas.height);
+      capturedImage = canvas.toDataURL('image/jpeg', 0.72); // ~150-250kB
 
       // Switch view: hide live cam, show preview
       videoWrap.style.display = 'none';
