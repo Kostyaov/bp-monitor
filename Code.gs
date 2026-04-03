@@ -16,10 +16,20 @@ function doPost(e) {
   try {
     const data = JSON.parse(e.postData.contents);
     
-    // ACTION: OCR
-    if (data.action === 'ocr') {
+    // ACTION: OCR & SAVE (Combined for mobile efficiency)
+    if (data.action === 'ocr' || data.action === 'ocr_and_save') {
       const ocrResult = callGeminiOCR(data.image);
-      return createJsonResponse({ status: 'success', result: ocrResult });
+      const storageResult = processEntry({
+        ...data,
+        sys: ocrResult.sys,
+        dia: ocrResult.dia,
+        pul: ocrResult.pul
+      });
+      return createJsonResponse({ 
+        status: 'success', 
+        result: ocrResult,
+        storage: storageResult 
+      });
     }
     
     // ACTION: SAVE
