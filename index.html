@@ -1202,8 +1202,12 @@
     // ────────────────────────────────────────────────────────────────────────
     // Capture → AI OCR
     // ────────────────────────────────────────────────────────────────────────
+    let isProcessing = false; // guard against double-tap
+
     document.getElementById('captureBtn').onclick = async () => {
       if (!cameraStream) { await startCamera(); return; }
+      if (isProcessing) return;   // ← блокуємо подвійний тап
+      isProcessing = true;
 
       // Grab frame from video — limit to 800px to avoid phone slowdown
       const vw = video.videoWidth  || 1280;
@@ -1248,6 +1252,7 @@
           showError(err.message);
         }
       } finally {
+        isProcessing = false;   // ← дозволяємо наступний знімок
         hideOverlay();
         captureRow.style.display = 'none';
         confirmRow.style.display = 'flex';
