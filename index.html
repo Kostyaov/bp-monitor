@@ -9,8 +9,7 @@
   <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;600;700&display=swap" rel="stylesheet">
   <!-- Lucide icons -->
   <script src="https://unpkg.com/lucide@latest"></script>
-  <!-- Tesseract.js -->
-  <script src="https://cdn.jsdelivr.net/npm/tesseract.js@5/dist/tesseract.min.js"></script>
+  <!-- Tesseract.js removed for AI Version -->
   <style>
     :root {
       --primary: #6366f1;
@@ -295,8 +294,8 @@
 
   <div class="container fade-in">
     <header>
-      <h1>Контроль Тиску</h1>
-      <p class="subtitle">Фото-фіксація та автоматичний облік</p>
+      <h1>Контроль Тиску AI</h1>
+      <p class="subtitle">Інтелектуальне розпізнавання показників (Gemini 1.5 Flash)</p>
     </header>
 
     <div class="card" id="mainCard">
@@ -304,7 +303,7 @@
 
       <div class="loading-overlay" id="loading">
         <div class="spinner"></div>
-        <p id="loadingText">Обробка фото...</p>
+        <p id="loadingText">Gemini AI аналізує фото...</p>
       </div>
 
       <div class="video-container">
@@ -373,8 +372,7 @@
     lucide.createIcons();
 
     // --- CONFIGURATION ---
-    // Вставте сюди ваш Web App URL після деплою в Google Apps Script
-    const GAS_URL = "https://script.google.com/macros/s/AKfycbwhOATp5BeuxsEzIen6JTqUaRUpC0M9G1ihDxb8A9Hw0UTRjpxVGNA5SURk99o3hRce/exec";
+    const GAS_URL = "https://script.google.com/macros/s/AKfycbwhOATp5BeuxsEzIen6JTqUaRUpC0M9G1ihDxb8A9Hw0UTRjpxVGNA5SURk99o3hRce/exec"; 
     // --- END CONFIGURATION ---
 
     let stream;
@@ -382,7 +380,6 @@
     const canvas = document.getElementById('canvas');
     const loading = document.getElementById('loading');
     const loadingText = document.getElementById('loadingText');
-    const historyBody = document.getElementById('historyBody');
     let capturedImageData = null;
 
     // Start Camera - Maximum compatibility version
@@ -410,20 +407,11 @@
         statusEl.innerText = 'Камера OK';
         statusEl.style.color = 'var(--success)';
         
-        // Remove retry button if it exists
         const oldRetry = document.getElementById('retryBtn');
         if (oldRetry) oldRetry.remove();
         
       } catch (err) {
         console.error("Camera Error:", err);
-        let errorMsg = "Доступ до камери заблоковано.";
-        
-        if (err.name === 'NotAllowedError' || err.name === 'PermissionDeniedError') {
-          errorMsg = "Доступ відхилено браузером.";
-        }
-
-        alert(`${errorMsg}\n\n1. Переконайтеся, що ви відкрили посилання в CHROME.\n2. Натисніть на значок 🔒 біля адреси сайту та дозвольте камеру.\n\nПомилка: ${err.message}`);
-        
         statusEl.innerText = 'Помилка доступу';
         statusEl.style.color = 'var(--error)';
 
@@ -439,104 +427,84 @@
       }
     }
 
-    // Capture & OCR
+    // Capture & Send to AI OCR + Storage
     document.getElementById('captureBtn').onclick = async () => {
       const context = canvas.getContext('2d');
       canvas.width = video.videoWidth;
       canvas.height = video.videoHeight;
       context.drawImage(video, 0, 0, canvas.width, canvas.height);
-
-      const imageData = canvas.toDataURL('image/jpeg', 0.8);
-      capturedImageData = imageData;
-
-      document.getElementById('capturedImagePreview').src = imageData;
+      
+      capturedImageData = canvas.toDataURL('image/jpeg', 0.8);
+      
+      document.getElementById('capturedImagePreview').src = capturedImageData;
       document.getElementById('capturedImagePreview').style.display = 'block';
       document.getElementById('saveContainer').style.display = 'block';
 
       loading.style.display = 'flex';
-      loadingText.innerText = "Розпізнавання тексту...";
-
+      loadingText.innerText = "Gemini AI аналізує та зберігає фото...";
+      
       try {
-        const result = await Tesseract.recognize(imageData, 'eng');
-        parseOCRResult(result.data.text);
+        // We send directly to AI for recognition and saving in one go
+        await fetch(GAS_URL, {
+          method: 'POST',
+          mode: 'no-cors',
+          body: JSON.stringify({ 
+            action: 'ocr_and_save', 
+            image: capturedImageData 
+          })
+        });
+        
+        alert("Запит AI надіслано! Дані будуть записані в таблицю протягом 2-3 секунд. Перевірте Google Таблицю.");
+        
+        // Clear fields for next entry
+        document.getElementById('sys').value = '';
+        document.getElementById('dia').value = '';
+        document.getElementById('pul').value = '';
+        document.getElementById('saveContainer').style.display = 'none';
+
       } catch (err) {
-        console.error("OCR Error:", err);
+        console.error("AI Error:", err);
+        alert("Помилка AI: " + err.message);
       } finally {
         loading.style.display = 'none';
       }
     };
 
-    function parseOCRResult(text) {
-      const numbers = text.match(/\b\d{2,3}\b/g) || [];
-      if (numbers.length >= 2) {
-        document.getElementById('sys').value = numbers[0] || '';
-        document.getElementById('dia').value = numbers[1] || '';
-        document.getElementById('pul').value = numbers[2] || '';
-      }
-    }
-
-    // Save Data via fetch (CORS)
+    // Manual Save fallback
     document.getElementById('saveBtn').onclick = async () => {
-      if (GAS_URL === "ВАШ_НОВИЙ_WEB_APP_URL") {
-        alert("Будь ласка, вставте ваш GAS URL у код файлу Index.html");
-        return;
-      }
-
       const data = {
         sys: document.getElementById('sys').value,
         dia: document.getElementById('dia').value,
         pul: document.getElementById('pul').value,
-        image: capturedImageData,
-        ocrMethod: 'Tesseract.js'
+        image: capturedImageData
       };
 
       if (!data.sys || !data.dia) {
-        alert("Заповніть показники тиску");
+        alert("Будь ласка, введіть показники вручну, якщо AI не спрацював.");
         return;
       }
 
       loading.style.display = 'flex';
-      loadingText.innerText = "Відправка даних у Google...";
+      loadingText.innerText = "Збереження вручну...";
 
       try {
-        const response = await fetch(GAS_URL, {
+        await fetch(GAS_URL, {
           method: 'POST',
-          mode: 'no-cors', // Critical for GAS to avoid preflight issues
-          body: JSON.stringify(data),
-          headers: {
-            'Content-Type': 'text/plain;charset=utf-8' // Use text/plain to bypass CORS preflight
-          }
+          mode: 'no-cors',
+          body: JSON.stringify(data)
         });
-
-        // Since we use 'no-cors', we won't get the body, but it sends successfully
-        alert("Дані надіслано! Перевірте Google Таблицю.");
-
-        loading.style.display = 'none';
+        alert("Дані збережені!");
         document.getElementById('saveContainer').style.display = 'none';
-        document.getElementById('sys').value = '';
-        document.getElementById('dia').value = '';
-        document.getElementById('pul').value = '';
-        // Note: loadHistory won't work easily with no-cors, but the data is saved.
       } catch (err) {
+        alert("Помилка збереження: " + err.message);
+      } finally {
         loading.style.display = 'none';
-        alert("Помилка відправки: " + err.message);
       }
     };
 
-    function formatDate(dateStr) {
-      const d = new Date(dateStr);
-      return d.toLocaleDateString('uk-UA', { day: '2-digit', month: '2-digit' }) + ' ' +
-        d.toLocaleTimeString('uk-UA', { hour: '2-digit', minute: '2-digit' });
-    }
-
-    // Initial Load
     startCamera();
-
-    // Export Logic (direct link to the Sheet)
-    function exportData() {
-      alert("Синхронізація з Таблицею Google автоматична. Ви можете завантажити Excel безпосередньо з вашої Google Таблиці.");
-    }
   </script>
+
 </body>
 
 </html>
