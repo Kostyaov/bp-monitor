@@ -1093,10 +1093,8 @@
           }],
           generationConfig: {
             temperature: 0,
-            maxOutputTokens: 512  // 64 was too low; thinking mode was consuming all tokens
-          },
-          // Disable thinking for gemini-2.5-flash (simple task, no reasoning needed)
-          thinkingConfig: { thinkingBudget: 0 }
+            maxOutputTokens: 512
+          }
         })
       });
 
