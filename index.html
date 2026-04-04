@@ -991,6 +991,19 @@
       <a class="modal-link" href="https://aistudio.google.com/app/apikey" target="_blank"
          rel="noopener">🔑 Отримати безкоштовно на aistudio.google.com →</a>
       <div class="modal-status" id="apiStatus"></div>
+
+      <!-- GAS URL -->
+      <label style="margin-top:18px;display:block">Google Sheets (URL резервного копіювання)</label>
+      <input type="text" class="modal-input" id="gasUrlInput"
+             placeholder="https://script.google.com/macros/s/.../exec"
+             autocomplete="off" spellcheck="false">
+      <p style="font-size:0.78rem;color:var(--text-muted);margin:6px 0 0;line-height:1.5">
+        💬 Якщо не заповнено — дані зберігаються
+        <strong>лише локально в браузері</strong>.
+        Для резервного копіювання в Google Таблицю вставте URL
+        вашого Google Apps Script Web App.
+      </p>
+      <div class="modal-status" id="gasStatus"></div>
       <div class="modal-row">
         <button class="btn btn-ghost" id="closeSettingsBtn">Закрити</button>
         <button class="btn btn-primary" id="saveApiBtn">Зберегти</button>
@@ -1028,7 +1041,7 @@
     // ── CONFIG ──────────────────────────────────────────────────────────────
     // GAS is used only as a fire-and-forget backup to Google Sheets.
     // OCR runs directly in the browser via Gemini API (no CORS issues).
-    const GAS_URL = 'https://script.google.com/macros/s/AKfycbwy8OLYKBmPVXUmymeJqVQIlANvAJS042H7G3HcsOv93jdVTyzdYbMU_KoKI4IPJ3E/exec';
+    const LS_GAS_URL  = 'bp_gas_url';    // localStorage key for GAS backup URL
     const GEMINI_ENDPOINT = 'https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent';
     const LS_HISTORY = 'bp_history';   // localStorage key
     const LS_API_KEY = 'bp_gemini_key'; // localStorage key
@@ -1163,7 +1176,9 @@
     // GAS fire-and-forget (backup to Google Sheets, no response needed)
     // ────────────────────────────────────────────────────────────────────────
     function gasSaveBackup(entry) {
-      fetch(GAS_URL, {
+      const url = localStorage.getItem(LS_GAS_URL) || '';
+      if (!url.startsWith('https://script.google.com/')) return; // не налаштовано — тільки локально
+      fetch(url, {
         method: 'POST',
         mode: 'no-cors',
         headers: { 'Content-Type': 'text/plain;charset=utf-8' },
@@ -1458,14 +1473,22 @@
     // Settings modal
     // ────────────────────────────────────────────────────────────────────────
     function openSettings() {
-      const modal = document.getElementById('settingsModal');
-      const input = document.getElementById('apiKeyInput');
+      const modal  = document.getElementById('settingsModal');
+      // Gemini API key
+      const input  = document.getElementById('apiKeyInput');
       const status = document.getElementById('apiStatus');
       const stored = localStorage.getItem(LS_API_KEY) || '';
-      input.value = stored ? '•'.repeat(20) : '';
+      input.value       = stored ? '•'.repeat(20) : '';
       input.placeholder = stored ? 'Ключ збережено — введіть новий або залиште' : 'AIzaSy...';
       status.textContent = stored ? '✅ Ключ налаштований' : '';
-      status.className = 'modal-status ' + (stored ? 'ok' : '');
+      status.className   = 'modal-status ' + (stored ? 'ok' : '');
+      // GAS URL
+      const gasInput  = document.getElementById('gasUrlInput');
+      const gasStatus = document.getElementById('gasStatus');
+      const gasStored = localStorage.getItem(LS_GAS_URL) || '';
+      gasInput.value        = gasStored;
+      gasStatus.textContent = gasStored ? '✅ Google Sheets backup налаштовано' : '📋 Тільки локальне збереження';
+      gasStatus.className   = 'modal-status ' + (gasStored ? 'ok' : '');
       modal.classList.add('open');
     }
 
@@ -1484,23 +1507,40 @@
     });
 
     document.getElementById('saveApiBtn').onclick = () => {
-      const val = document.getElementById('apiKeyInput').value.trim();
+      const val    = document.getElementById('apiKeyInput').value.trim();
       const status = document.getElementById('apiStatus');
+      // Validate Gemini key
       if (!val || val.includes('•')) {
         status.textContent = 'Введіть ключ';
-        status.className = 'modal-status err';
+        status.className   = 'modal-status err';
         return;
       }
       if (!val.startsWith('AIza')) {
         status.textContent = 'Ключ має починатися з AIza...';
-        status.className = 'modal-status err';
+        status.className   = 'modal-status err';
         return;
       }
       localStorage.setItem(LS_API_KEY, val);
       status.textContent = '✅ Збережено!';
-      status.className = 'modal-status ok';
-      setTimeout(closeSettings, 800);
-      showToast('API ключ збережено. Можна фотографувати!', 'success');
+      status.className   = 'modal-status ok';
+      // Validate & save GAS URL
+      const gasVal    = document.getElementById('gasUrlInput').value.trim();
+      const gasStatus = document.getElementById('gasStatus');
+      if (gasVal === '') {
+        localStorage.removeItem(LS_GAS_URL);
+        gasStatus.textContent = '📋 Backup вимкнено — тільки локально';
+        gasStatus.className   = 'modal-status';
+      } else if (gasVal.startsWith('https://script.google.com/')) {
+        localStorage.setItem(LS_GAS_URL, gasVal);
+        gasStatus.textContent = '✅ Google Sheets backup налаштовано';
+        gasStatus.className   = 'modal-status ok';
+      } else {
+        gasStatus.textContent = 'Невірний URL. Має починатися з https://script.google.com/';
+        gasStatus.className   = 'modal-status err';
+        return;
+      }
+      setTimeout(closeSettings, 900);
+      showToast('Налаштування збережено!', 'success');
     };
 
     // ────────────────────────────────────────────────────────────────────────
