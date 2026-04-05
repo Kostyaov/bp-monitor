@@ -712,20 +712,24 @@
 
     /* ── Settings button ─────────────────────────────────────────────────── */
     .settings-btn {
-      background: rgba(255,255,255,0.07);
-      border: 1px solid var(--glass-border);
-      color: var(--text-muted);
-      border-radius: 10px;
-      width: 36px;
-      height: 36px;
+      background: rgba(255,255,255,0.08);
+      border: 2px solid var(--primary);
+      color: rgba(255,255,255,0.85);
+      border-radius: 16px;
+      width: 64px;
+      height: 64px;
       display: flex;
       align-items: center;
       justify-content: center;
       cursor: pointer;
       transition: background .2s, color .2s;
       position: absolute;
-      top: auto;
-      bottom: 2px;
+      top: 50%;
+      transform: translateY(-50%);
+    }
+    .settings-btn svg {
+      width: 28px;
+      height: 28px;
     }
     .settings-btn:hover { background: rgba(99,102,241,.2); color: var(--text); }
     #chartBtn { left: 0; }
