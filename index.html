@@ -74,6 +74,7 @@
     header {
       padding: 24px 0 8px;
       text-align: center;
+      position: relative;
     }
 
     .logo-wrap {
@@ -722,10 +723,12 @@
       justify-content: center;
       cursor: pointer;
       transition: background .2s, color .2s;
-      flex-shrink: 0;
-      margin-left: auto;
+      position: absolute;
+      top: 16px;
     }
     .settings-btn:hover { background: rgba(99,102,241,.2); color: var(--text); }
+    #chartBtn { left: 0; }
+    #settingsBtn { right: 0; }
 
     /* ── Settings Modal ─────────────────────────────────────────────────── */
     .modal-overlay {
@@ -876,7 +879,7 @@
         <h1>Контроль Тиску</h1>
       </div>
       <p class="subtitle">AI розпізнавання • Gemini 2.5 Flash</p>
-      <button class="settings-btn" id="chartBtn" title="Графік показників" style="margin-right:6px">
+      <button class="settings-btn" id="chartBtn" title="Графік показників">
         <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="22 12 18 12 15 21 9 3 6 12 2 12"/></svg>
       </button>
       <button class="settings-btn" id="settingsBtn" title="Налаштування API">
