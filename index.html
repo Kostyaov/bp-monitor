@@ -812,8 +812,13 @@
       padding: 24px 20px 20px;
       width: min(96vw, 600px);
       max-height: 90vh;
+      overflow-x: hidden;
       overflow-y: auto;
       backdrop-filter: blur(24px);
+      box-sizing: border-box;
+      display: flex;
+      flex-direction: column;
+      position: relative;
     }
     .chart-modal-card h3 { font-size: 1.1rem; font-weight: 700; margin-bottom: 16px; }
     .period-chips { display: flex; gap: 8px; margin-bottom: 20px; }
@@ -1166,6 +1171,7 @@
       </div>
 
       <!-- Legend -->
+      <div class="chart-legend">
         <div class="legend-item"><div class="legend-dot" style="background:#ef4444"></div> SYS</div>
         <div class="legend-item"><div class="legend-dot" style="background:#6366f1"></div> DIA</div>
         <div class="legend-item"><div class="legend-dot" style="background:#10b981"></div> Пульс</div>
@@ -1780,6 +1786,7 @@
       const headData = filteredData.map(item => item.head || 0);
 
       const ctx = document.getElementById('bpChart').getContext('2d');
+      const isMobile = window.innerWidth < 600;
 
       if (bpChartInstance) {
         bpChartInstance.destroy();
@@ -1838,48 +1845,55 @@
             }
           ]
         },
-        options: {
-          responsive: true,
-          maintainAspectRatio: false,
-          interaction: {
-            mode: 'index',
-            intersect: false,
-          },
-          plugins: {
-            legend: { display: false }, // Use custom legend implemented in HTML
-            tooltip: {
-              backgroundColor: 'rgba(17, 24, 47, 0.9)',
-              titleColor: '#f0f4ff',
-              bodyColor: '#cfd8ef',
-              borderColor: 'rgba(255,255,255,0.1)',
-              borderWidth: 1,
-              padding: 10,
-              displayColors: true,
-            }
-          },
-          scales: {
-            x: {
-              grid: { color: 'rgba(255,255,255,0.05)' },
-              ticks: { color: '#7c8db5', maxTicksLimit: 7 }
+          options: {
+            responsive: true,
+            maintainAspectRatio: false,
+            layout: {
+              padding: { left: 0, right: isMobile ? 15 : 5, top: 0, bottom: 0 }
             },
-            y: {
-              grid: { color: 'rgba(255,255,255,0.05)' },
-              ticks: { color: '#7c8db5' },
-              suggestedMin: 50,
-              suggestedMax: 160,
-              position: 'left',
-              title: { display: true, text: 'mmHg', color: '#7c8db5', font: { size: 10 } }
+            interaction: {
+              mode: 'index',
+              intersect: false,
             },
-            yHead: {
-              grid: { display: false },
-              ticks: { color: 'rgba(245, 158, 11, 0.7)', callback: (v) => v + '%' },
-              min: 0,
-              max: 100,
-              position: 'right',
-              title: { display: true, text: 'Голова %', color: 'rgba(245, 158, 11, 0.7)', font: { size: 10 } }
+            plugins: {
+              legend: { display: false },
+              tooltip: {
+                backgroundColor: 'rgba(17, 24, 47, 0.9)',
+                titleColor: '#f0f4ff',
+                bodyColor: '#cfd8ef',
+                borderColor: 'rgba(255,255,255,0.1)',
+                borderWidth: 1,
+                padding: 10,
+                displayColors: true,
+              }
+            },
+            scales: {
+              x: {
+                grid: { color: 'rgba(255,255,255,0.05)' },
+                ticks: { color: '#7c8db5', maxTicksLimit: 7, font: { size: isMobile ? 9 : 11 } }
+              },
+              y: {
+                grid: { color: 'rgba(255,255,255,0.05)' },
+                ticks: { color: '#7c8db5', font: { size: isMobile ? 9 : 11 } },
+                suggestedMin: 50,
+                suggestedMax: 160,
+                position: 'left',
+                title: { display: !isMobile, text: 'mmHg', color: '#7c8db5', font: { size: 10 } }
+              },
+              yHead: {
+                grid: { display: false },
+                ticks: { 
+                  color: 'rgba(245, 158, 11, 0.7)', 
+                  font: { size: isMobile ? 9 : 11 },
+                  callback: (v) => v + '%' 
+                },
+                min: 0,
+                max: 100,
+                position: 'right',
+                title: { display: !isMobile, text: 'Голова %', color: 'rgba(245, 158, 11, 0.7)', font: { size: 10 } }
+              }
             }
           }
-        }
       });
     }
 
