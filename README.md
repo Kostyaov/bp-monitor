@@ -69,6 +69,8 @@ graph TD
     A[📷 Камера] --> B[🖼️ Захоплення кадру 800px]
     B --> C[🤖 Gemini AI OCR]
     C --> D[📝 Перевірка значень користувачем]
+    D --> I[🤔 Оцінка головного болю 0-100%]
+    I --> D
     D --> E{Тап Зберегти}
     E --> F[💾 LocalStorage - 5000 записів]
     E --> G[☁️ Google Sheets Backup - опційно]
@@ -89,13 +91,16 @@ graph TD
   "date": "2026-04-15T12:00:00.000Z",
   "sys": 120,
   "dia": 80,
-  "pul": 72
+  "pul": 72,
+  "head": 25
 }
 ```
 
 ### Google Sheets
 Скрипт автоматично створює лист **"History"** з колонками:
-`Дата і час | SYS | DIA | PUL`
+| Дата і час | SYS | DIA | PUL | HEAD |
+|---|---|---|---|---|
+| 15.04.2026 12:00 | 120 | 80 | 72 | 25 |
 
 ---
 
@@ -125,12 +130,12 @@ function doPost(e) {
 
     if (!sheet) {
       sheet = ss.insertSheet('History');
-      sheet.appendRow(['Дата і час', 'SYS', 'DIA', 'PUL']);
-      sheet.getRange(1, 1, 1, 4).setFontWeight('bold').setBackground('#f3f3f3');
+      sheet.appendRow(['Дата і час', 'SYS', 'DIA', 'PUL', 'HEAD']);
+      sheet.getRange(1, 1, 1, 5).setFontWeight('bold').setBackground('#f3f3f3');
     }
 
     const ts = data.date ? new Date(data.date) : new Date();
-    sheet.appendRow([ts, Number(data.sys) || 0, Number(data.dia) || 0, Number(data.pul) || 0]);
+    sheet.appendRow([ts, Number(data.sys) || 0, Number(data.dia) || 0, Number(data.pul) || 0, Number(data.head) || 0]);
 
     return ContentService
       .createTextOutput(JSON.stringify({ status: 'ok' }))

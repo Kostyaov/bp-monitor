@@ -842,6 +842,32 @@
     .legend-item { display: flex; align-items: center; gap: 6px; font-size: 0.78rem; color: var(--text-muted); }
     .legend-dot { width: 10px; height: 10px; border-radius: 50%; flex-shrink: 0; }
 
+    /* ── Headache selector ───────────────────────────────────────────────── */
+    .headache-wrap { margin-top: 18px; padding-top: 15px; border-top: 1px solid var(--glass-border); }
+    .headache-title { font-size: 0.72rem; font-weight: 700; text-transform: uppercase; color: var(--text-dim); margin-bottom: 10px; display: block; }
+    .headache-chips { display: flex; gap: 8px; flex-wrap: wrap; }
+    .head-chip {
+      padding: 8px 0;
+      flex: 1;
+      min-width: 50px;
+      border-radius: 12px;
+      border: 1px solid var(--glass-border);
+      background: rgba(255,255,255,0.03);
+      color: var(--text-muted);
+      font-size: 0.8rem;
+      font-weight: 600;
+      cursor: pointer;
+      transition: all .2s;
+      text-align: center;
+    }
+    .head-chip:hover { background: rgba(255,255,255,0.06); color: var(--text); }
+    .head-chip.active {
+      background: var(--primary);
+      border-color: var(--primary);
+      color: #fff;
+      box-shadow: 0 0 10px var(--primary-glow);
+    }
+
     /* ── Responsive ──────────────────────────────────────────────────────── */
     @media (max-width: 380px) {
       .results-grid { gap: 8px; }
@@ -905,6 +931,20 @@
         <div class="input-group">
           <label>Пульс</label>
           <input type="number" id="pul" class="input-field" placeholder="—" min="0" max="250">
+        </div>
+      </div>
+
+      <!-- Headache intensity selector (Head) -->
+      <div id="headacheSection" style="display:none;">
+        <div class="headache-wrap">
+          <span class="headache-title">🤔 Головний біль?</span>
+          <div class="headache-chips" id="headChips">
+            <button class="head-chip active" data-val="0">0%</button>
+            <button class="head-chip" data-val="25">25%</button>
+            <button class="head-chip" data-val="50">50%</button>
+            <button class="head-chip" data-val="75">75%</button>
+            <button class="head-chip" data-val="100">100%</button>
+          </div>
         </div>
       </div>
 
@@ -986,6 +1026,7 @@
               <th>Дата / Час</th>
               <th>Тиск</th>
               <th>Пульс</th>
+              <th>Голова</th>
               <th style="text-align:right">Дії</th>
             </tr>
           </thead>
@@ -1025,6 +1066,17 @@
         <div class="input-group">
           <label>Пульс</label>
           <input type="number" id="editPul" class="input-field" min="0" max="250">
+        </div>
+      </div>
+
+      <div class="headache-wrap" style="border-top:none; padding-top:0; margin-bottom:20px;">
+        <span class="headache-title">🤔 Головний біль?</span>
+        <div class="headache-chips" id="editHeadChips">
+          <button class="head-chip" data-val="0">0%</button>
+          <button class="head-chip" data-val="25">25%</button>
+          <button class="head-chip" data-val="50">50%</button>
+          <button class="head-chip" data-val="75">75%</button>
+          <button class="head-chip" data-val="100">100%</button>
         </div>
       </div>
 
@@ -1362,6 +1414,7 @@
         hideOverlay();
         captureRow.style.display = 'none';
         confirmRow.style.display = 'flex';
+        document.getElementById('headacheSection').style.display = 'block';
       }
     };
 
@@ -1382,6 +1435,10 @@
       captureRow.style.display = 'flex';
       confirmRow.style.display = 'none';
       ocrWarning.classList.remove('show');
+      document.getElementById('headacheSection').style.display = 'none';
+      // Reset chips to 0%
+      document.querySelectorAll('#headChips .head-chip').forEach(c => c.classList.remove('active'));
+      document.querySelector('#headChips .head-chip[data-val="0"]').classList.add('active');
     };
 
     // ── Save ──────────────────────────────────────────────────────────────────
@@ -1396,10 +1453,13 @@
         return;
       }
 
+      const head = parseInt(document.querySelector('#headChips .head-chip.active')?.dataset.val || 0);
+
       const entry = {
         date: new Date().toISOString(),
         sys, dia,
-        pul: pul || 0
+        pul: pul || 0,
+        head
       };
 
       // PRIMARY: save to localStorage (instant, always works)
@@ -1447,6 +1507,11 @@
             </div>
           </td>
           <td>
+            <div style="font-size:0.85rem; font-weight:600; color:${r.head > 0 ? 'var(--primary)' : 'var(--text-dim)'}">
+              ${r.head !== undefined ? r.head + '%' : '0%'}
+            </div>
+          </td>
+          <td>
             <div class="actions-cell">
               <button class="btn-action btn-edit" onclick="openEditModal('${r.date}')" title="Редагувати">
                 <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/></svg>
@@ -1475,7 +1540,8 @@
           'Дата і час': isNaN(d) ? '' : d.toLocaleString('uk-UA'),
           'SYS (Верхній)': r.sys,
           'DIA (Нижній)': r.dia,
-          'Пульс': r.pul
+          'Пульс': r.pul,
+          'Голова (%)': r.head || 0
         };
       });
 
@@ -1483,7 +1549,7 @@
       const ws = XLSX.utils.json_to_sheet(rows);
 
       // Column widths
-      ws['!cols'] = [{ wch: 20 }, { wch: 14 }, { wch: 14 }, { wch: 10 }];
+      ws['!cols'] = [{ wch: 20 }, { wch: 14 }, { wch: 14 }, { wch: 10 }, { wch: 12 }];
 
       XLSX.utils.book_append_sheet(wb, ws, 'Тиск');
 
@@ -1666,6 +1732,15 @@
       });
     });
 
+    // Headache chips logic
+    document.querySelectorAll('.headache-chips .head-chip').forEach(btn => {
+      btn.addEventListener('click', (e) => {
+        const container = e.target.closest('.headache-chips');
+        container.querySelectorAll('.head-chip').forEach(c => c.classList.remove('active'));
+        e.target.classList.add('active');
+      });
+    });
+
     function renderChart(period) {
       const now = new Date();
       let startTime = new Date();
@@ -1811,6 +1886,12 @@
       document.getElementById('editPul').value = record.pul || '';
       document.getElementById('editDateId').value = date;
       
+      // Select head chip
+      const headVal = record.head || 0;
+      document.querySelectorAll('#editHeadChips .head-chip').forEach(c => {
+        c.classList.toggle('active', parseInt(c.dataset.val) === headVal);
+      });
+      
       document.getElementById('editModal').classList.add('open');
     }
 
@@ -1834,6 +1915,7 @@
         historyData[idx].sys = sys;
         historyData[idx].dia = dia;
         historyData[idx].pul = pul || 0;
+        historyData[idx].head = parseInt(document.querySelector('#editHeadChips .head-chip.active')?.dataset.val || 0);
         
         localStorage.setItem(LS_HISTORY, JSON.stringify(historyData));
         renderHistory();
