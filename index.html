@@ -609,42 +609,6 @@
       margin-top: 2px;
     }
 
-    /* BP status pill */
-    .bp-pill {
-      display: inline-block;
-      padding: 2px 8px;
-      border-radius: 20px;
-      font-size: 0.6rem;
-      font-weight: 700;
-      letter-spacing: 0.04em;
-      text-transform: uppercase;
-    }
-
-    .bp-normal {
-      background: rgba(16, 185, 129, .18);
-      color: #10b981;
-    }
-
-    .bp-elevated {
-      background: rgba(99, 102, 241, .18);
-      color: #8b92e8;
-    }
-
-    .bp-stage1 {
-      background: rgba(245, 158, 11, .18);
-      color: #f59e0b;
-    }
-
-    .bp-stage2 {
-      background: rgba(239, 68, 68, .18);
-      color: #ef4444;
-    }
-
-    .bp-crisis {
-      background: rgba(190, 18, 60, .25);
-      color: #fb7185;
-    }
-
     /* Action buttons in table */
     .actions-cell {
       display: flex;
@@ -1022,7 +986,6 @@
               <th>Дата / Час</th>
               <th>Тиск</th>
               <th>Пульс</th>
-              <th>Статус</th>
               <th style="text-align:right">Дії</th>
             </tr>
           </thead>
@@ -1468,8 +1431,6 @@
         const d = new Date(r.date);
         const dateMain = isNaN(d) ? '—' : d.toLocaleDateString('uk-UA', { day: '2-digit', month: 'short', year: 'numeric' });
         const timeSub = isNaN(d) ? '' : d.toLocaleTimeString('uk-UA', { hour: '2-digit', minute: '2-digit' });
-        const status = bpStatus(r.sys, r.dia);
-
         return `<tr>
           <td>
             <div class="date-main">${dateMain}</div>
@@ -1485,7 +1446,6 @@
               ${r.pul || '—'}
             </div>
           </td>
-          <td><span class="bp-pill ${status.cls}">${status.label}</span></td>
           <td>
             <div class="actions-cell">
               <button class="btn-action btn-edit" onclick="openEditModal('${r.date}')" title="Редагувати">
@@ -1500,16 +1460,6 @@
       }).join('');
     }
 
-    // ── Blood pressure classification (ESC 2023 guidelines) ─────────────────
-    function bpStatus(sys, dia) {
-      if (!sys || !dia) return { cls: '', label: '—' };
-      if (sys >= 180 || dia >= 120) return { cls: 'bp-crisis', label: 'Криз' };
-      if (sys >= 140 || dia >= 90) return { cls: 'bp-stage2', label: 'АГ 2' };
-      if (sys >= 130 || dia >= 80) return { cls: 'bp-stage1', label: 'АГ 1' };
-      if (sys >= 120) return { cls: 'bp-elevated', label: 'Підвищ.' };
-      return { cls: 'bp-normal', label: 'Норма' };
-    }
-
     // ────────────────────────────────────────────────────────────────────────
     // Export to XLSX (SheetJS)
     // ────────────────────────────────────────────────────────────────────────
@@ -1521,13 +1471,11 @@
 
       const rows = historyData.map(r => {
         const d = new Date(r.date);
-        const status = bpStatus(r.sys, r.dia);
         return {
           'Дата і час': isNaN(d) ? '' : d.toLocaleString('uk-UA'),
           'SYS (Верхній)': r.sys,
           'DIA (Нижній)': r.dia,
-          'Пульс': r.pul,
-          'Статус': status.label
+          'Пульс': r.pul
         };
       });
 
@@ -1535,7 +1483,7 @@
       const ws = XLSX.utils.json_to_sheet(rows);
 
       // Column widths
-      ws['!cols'] = [{ wch: 20 }, { wch: 14 }, { wch: 14 }, { wch: 10 }, { wch: 12 }];
+      ws['!cols'] = [{ wch: 20 }, { wch: 14 }, { wch: 14 }, { wch: 10 }];
 
       XLSX.utils.book_append_sheet(wb, ws, 'Тиск');
 
